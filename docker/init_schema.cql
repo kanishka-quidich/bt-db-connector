@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS camera (
 -- Table 3: Ball table
 CREATE TABLE IF NOT EXISTS ball (
     BallID text,
-    Timestamp timestamp,
+    Timestamp text,
     Disk text,
     Camera text,
     PRIMARY KEY (BallID, Camera)

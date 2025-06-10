@@ -21,24 +21,31 @@ CameraTable::CameraTable(CassSession* sess) : session(sess) {}
 
     // Get a camera row by primary key
     std::string CameraTable::get(const std::string& camera) {
-        const char* query = "SELECT System FROM quidich.camera WHERE Camera = ?;";
+        const char* query = "SELECT Camera, SSN, Camera_IP, System FROM quidich.camera WHERE Camera = ?;";
         CassStatement* statement = cass_statement_new(query, 1);
         cass_statement_bind_string(statement, 0, camera.c_str());
         CassFuture* result_future = cass_session_execute(session, statement);
         cass_future_wait(result_future);
         const CassResult* result = cass_future_get_result(result_future);
-        std::string system;
+        std::string output;
         if (cass_result_row_count(result) > 0) {
             const CassRow* row = cass_result_first_row(result);
-            const CassValue* val = cass_row_get_column_by_name(row, "System");
-            const char* sys; size_t len;
-            cass_value_get_string(val, &sys, &len);
-            system.assign(sys, len);
+            const char* ip; size_t ip_len;
+            const char* sys; size_t sys_len;
+            cass_int32_t ssn;
+            const CassValue* ip_val = cass_row_get_column_by_name(row, "Camera_IP");
+            const CassValue* sys_val = cass_row_get_column_by_name(row, "System");
+            const CassValue* ssn_val = cass_row_get_column_by_name(row, "SSN");
+            cass_value_get_string(ip_val, &ip, &ip_len);
+            cass_value_get_string(sys_val, &sys, &sys_len);
+            cass_value_get_int32(ssn_val, &ssn);
+            output = std::string(sys, sys_len) + "|" + std::to_string(ssn) + "|" + 
+                    std::string(ip, ip_len) + "|" + camera;
         }
         cass_result_free(result);
         cass_future_free(result_future);
         cass_statement_free(statement);
-        return system + "|||" + camera;
+        return output;
     }
 
 SystemTable::SystemTable(CassSession* sess) : session(sess) {}
@@ -55,8 +62,24 @@ SystemTable::SystemTable(CassSession* sess) : session(sess) {}
     }
 
     std::string SystemTable::get(const std::string& system) {
-        // Only system is available for output
-        return system + "|||";
+        const char* query = "SELECT System, System_IP FROM quidich.system WHERE System = ?;";
+        CassStatement* statement = cass_statement_new(query, 1);
+        cass_statement_bind_string(statement, 0, system.c_str());
+        CassFuture* result_future = cass_session_execute(session, statement);
+        cass_future_wait(result_future);
+        const CassResult* result = cass_future_get_result(result_future);
+        std::string output;
+        if (cass_result_row_count(result) > 0) {
+            const CassRow* row = cass_result_first_row(result);
+            const char* sys_ip; size_t ip_len;
+            const CassValue* ip_val = cass_row_get_column_by_name(row, "System_IP");
+            cass_value_get_string(ip_val, &sys_ip, &ip_len);
+            output = system + "|" + std::string(sys_ip, ip_len) + "|";
+        }
+        cass_result_free(result);
+        cass_future_free(result_future);
+        cass_statement_free(statement);
+        return output;
     }
 
 // End SystemTable implementation
@@ -70,37 +93,60 @@ BallTable::BallTable(CassSession* sess) : session(sess) {}
         cass_statement_bind_string(statement, 1, timestamp.c_str());
         cass_statement_bind_string(statement, 2, disk.c_str());
         cass_statement_bind_string(statement, 3, camera.c_str());
+        
         CassFuture* result_future = cass_session_execute(session, statement);
         cass_future_wait(result_future);
+        
+        if (cass_future_error_code(result_future) != CASS_OK) {
+            const char* message;
+            size_t message_length;
+            cass_future_error_message(result_future, &message, &message_length);
+            std::cerr << "Error inserting ball data: " << std::string(message, message_length) << std::endl;
+        }
+        
         cass_future_free(result_future);
         cass_statement_free(statement);
     }
 
-    std::vector<std::string> BallTable::get(const std::string& ballId) {
-        const char* query = "SELECT Disk, Camera FROM quidich.ball WHERE BallID = ?;";
+    std::string BallTable::get(const std::string& ballId) {
+        const char* query = "SELECT BallID, Timestamp, Disk, Camera FROM quidich.ball WHERE BallID = ?;";
         CassStatement* statement = cass_statement_new(query, 1);
         cass_statement_bind_string(statement, 0, ballId.c_str());
         CassFuture* result_future = cass_session_execute(session, statement);
         cass_future_wait(result_future);
         const CassResult* result = cass_future_get_result(result_future);
-        std::vector<std::string> paths;
-        CassIterator* iterator = cass_iterator_from_result(result);
-        while (cass_iterator_next(iterator)) {
-            const CassRow* row = cass_iterator_get_row(iterator);
+        
+        std::string paths;
+        CassIterator* rows = cass_iterator_from_result(result);
+        bool hasRows = false;
+        
+        while (cass_iterator_next(rows)) {
+            hasRows = true;
+            const CassRow* row = cass_iterator_get_row(rows);
+            const char* disk; size_t disk_len;
+            const char* cam; size_t cam_len;
+            const char* ts; size_t ts_len;
+            
             const CassValue* disk_val = cass_row_get_column_by_name(row, "Disk");
-            const CassValue* camera_val = cass_row_get_column_by_name(row, "Camera");
-            const char* d; size_t dlen;
-            const char* c; size_t clen;
-            cass_value_get_string(disk_val, &d, &dlen);
-            cass_value_get_string(camera_val, &c, &clen);
-            std::string disk(d, dlen);
-            std::string camera(c, clen);
-            paths.push_back("|" + disk + "|" + ballId + "|" + camera);
+            const CassValue* cam_val = cass_row_get_column_by_name(row, "Camera");
+            const CassValue* ts_val = cass_row_get_column_by_name(row, "Timestamp");
+            
+            if (disk_val && cam_val && ts_val) {
+                cass_value_get_string(disk_val, &disk, &disk_len);
+                cass_value_get_string(cam_val, &cam, &cam_len);
+                cass_value_get_string(ts_val, &ts, &ts_len);
+                
+                paths +=  std::string(disk, disk_len) + "|" + 
+                        ballId + "|" + 
+                        std::string(cam, cam_len) + "@";
+            }
         }
-        cass_iterator_free(iterator);
+        
+        cass_iterator_free(rows);
         cass_result_free(result);
         cass_future_free(result_future);
         cass_statement_free(statement);
-        return paths;
+        
+        return hasRows ? paths : "Paths are empty";
     }
 } // namespace quidich

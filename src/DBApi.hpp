@@ -27,7 +27,7 @@ public:
     BallTable(CassSession* sess);
     void insert(const std::string& ballId, const std::string& timestamp, 
                 const std::string& disk, const std::string& camera);
-    std::vector<std::string> get(const std::string& ballId); // changed return type
+    std::string get(const std::string& ballId); // changed return type
 };
 
 } // namespace quidich
