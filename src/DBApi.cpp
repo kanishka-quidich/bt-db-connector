@@ -7,7 +7,7 @@ CameraTable::CameraTable(CassSession* sess) : session(sess) {}
 
     // Insert a camera row
     void CameraTable::insert(const std::string& camera, int ssn, const std::string& ip, const std::string& system) {
-        const char* query = "INSERT INTO quidich.camera (Camera, SSN, IP, System) VALUES (?, ?, ?, ?);";
+        const char* query = "INSERT INTO quidich.camera (Camera, SSN, Camera_IP, System) VALUES (?, ?, ?, ?);";
         CassStatement* statement = cass_statement_new(query, 4);
         cass_statement_bind_string(statement, 0, camera.c_str());
         cass_statement_bind_int32(statement, 1, ssn);
@@ -44,7 +44,7 @@ CameraTable::CameraTable(CassSession* sess) : session(sess) {}
 SystemTable::SystemTable(CassSession* sess) : session(sess) {}
 
     void SystemTable::insert(const std::string& system, const std::string& ip) {
-        const char* query = "INSERT INTO quidich.system (System, IP) VALUES (?, ?);";
+        const char* query = "INSERT INTO quidich.system (System, System_IP) VALUES (?, ?);";
         CassStatement* statement = cass_statement_new(query, 2);
         cass_statement_bind_string(statement, 0, system.c_str());
         cass_statement_bind_string(statement, 1, ip.c_str());

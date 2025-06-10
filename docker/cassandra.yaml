@@ -1,0 +1,13 @@
+cluster_name: 'BallTracking Cluster'
+num_tokens: 256
+data_file_directories:
+    - /var/lib/cassandra/data
+commitlog_directory: /var/lib/cassandra/commitlog
+listen_address: 0.0.0.0
+rpc_address: 0.0.0.0
+broadcast_rpc_address: 172.17.0.2
+seed_provider:
+    - class_name: org.apache.cassandra.locator.SimpleSeedProvider
+      parameters:
+          - seeds: "172.17.0.2"
+# ...Cassandra does not use api_address, developer_mode, or experimental_features...
